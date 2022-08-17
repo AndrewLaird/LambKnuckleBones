@@ -7,6 +7,7 @@
 # play continues until one player fills up their board
 import random
 from collections import Counter, defaultdict
+from enum import Enum
 import copy
 import numpy as np
 
@@ -87,7 +88,7 @@ class Board:
     def is_over(self):
         return self.winner != -2
 
-    def repr_player(self, player: int, reverse_rows=False):
+    def repr_player(self, player: int, reverse_rows=False) -> str:
         player_board = self.board[player]
         # 2d array we want all the 0's then all the 1's
         rows = []
@@ -101,11 +102,15 @@ class Board:
             return "\n".join(rows[::-1])
         return "\n".join(rows)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         # print the top player as player 0
         return (
             self.repr_player(1, reverse_rows=True)
-            + "\n------------------" + str(self.get_score(0))+":"+ str(self.get_score(1)) + "\n"
+            + "\n------------------"
+            + str(self.get_score(0))
+            + ":"
+            + str(self.get_score(1))
+            + "\n"
             + self.repr_player(0)
         )
 
@@ -124,6 +129,12 @@ def knucklebones():
         player = other_player(player)
 
 
+class Outcomes(int, Enum):
+    TIE = -1
+    PLAYER0 = 0
+    PLAYER1 = 1
+
+
 class Memoize:
     def __init__(self, f):
         self.f = f
@@ -131,10 +142,10 @@ class Memoize:
         self.seen = set()
 
     def __call__(self, board: Board, player: int, depth: int):
-        # ignore depth
+        # ignore depth for identifier
         identifier = str(player) + str(board)
         if identifier in self.seen:
-            return {-1: 0, 0: 0, 1: 0}
+            return {Outcomes.TIE: 0, Outcomes.PLAYER0: 0, Outcomes.PLAYER1: 0}
         # ones we are working on right now, this is an infinite loop
         self.seen.add(identifier)
         if identifier not in self.memo:
@@ -154,7 +165,7 @@ MAX_DEPTH = 3
 
 @Memoize
 def knuclebones_recursive(board: Board, player: int, depth: int) -> dict:
-    outcomes = {-1: 0, 0: 0, 1: 0}
+    outcomes = {Outcomes.TIE: 0, Outcomes.PLAYER0: 0, Outcomes.PLAYER1: 0}
     if depth > MAX_DEPTH:
         # say the one with the higher score won
         current_winning_player = board.get_current_higher_score()
@@ -205,7 +216,6 @@ def get_best_move(board: Board, player: int, number_rolled: int):
     return best_move
 
 
-
 def play_against_knucklebones_ai():
     player = 0
     board = Board()
@@ -213,25 +223,26 @@ def play_against_knucklebones_ai():
         number_rolled = random.randrange(1, 7)
         print("Board:")
         print(board)
-        #print(f"Player {player} your die is {number_rolled}")
+        # print(f"Player {player} your die is {number_rolled}")
         if player == 0:
-            #print("AI is thinking .....")
+            # print("AI is thinking .....")
             col = get_best_move(board, player, number_rolled)
         else:
-            #print("AI is thinking .....")
+            # print("AI is thinking .....")
             col = get_best_move(board, player, number_rolled)
-            #col = int(input("Select column:"))
+            # col = int(input("Select column:"))
         board.insert_col(player, col, number_rolled)
         player = other_player(player)
-
 
     player0_score = board.get_score(0)
     player1_score = board.get_score(1)
     print(f"We have a winner: {board.winner}, {player0_score}: {player1_score}")
     return board.winner
 
+
 def collect_data():
-    outcomes = {-1: 0, 0: 0, 1: 0}
+    outcomes = {Outcomes.TIE: 0, Outcomes.PLAYER1: 0, Outcomes.PLAYER1: 0}
+    #5% 65% 30%
     for i in range(1000):
         winner = play_against_knucklebones_ai()
         outcomes[winner] += 1
@@ -239,6 +250,6 @@ def collect_data():
 
 
 # knucklebones()
-#knucklebones_ai()
-play_against_knucklebones_ai()
-# collect_data()
+# knucklebones_ai()
+# play_against_knucklebones_ai()
+collect_data()
