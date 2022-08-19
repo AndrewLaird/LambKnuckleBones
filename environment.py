@@ -13,10 +13,6 @@ import numpy as np
 
 import sys
 
-print("current limit", sys.getrecursionlimit())
-sys.setrecursionlimit(300000)
-
-
 BOARD_WIDTH = 3
 BOARD_HEIGHT = 3
 TIE = -1
@@ -160,7 +156,7 @@ def update_array(to_update, source):
     return to_update
 
 
-MAX_DEPTH = 3
+MAX_DEPTH = 4
 
 
 @Memoize
@@ -252,4 +248,3 @@ def collect_data():
 # knucklebones()
 # knucklebones_ai()
 # play_against_knucklebones_ai()
-collect_data()
