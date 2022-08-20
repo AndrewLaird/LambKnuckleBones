@@ -68,6 +68,14 @@ class Board:
             return 0
         return 1
 
+    def get_score_difference(self, player):
+        player0_score = self.get_score(0)
+        player1_score = self.get_score(1)
+        difference = player0_score-player1_score
+        if(player):
+            return - difference
+        return difference
+
     def delete_values_matching_in_column(self, player, col, value):
         # only hard part is sliding the rest down
         slide_amount = 0
@@ -130,6 +138,26 @@ class Outcomes(int, Enum):
     PLAYER0 = 0
     PLAYER1 = 1
 
+class MemoizeAverageValue:
+    def __init__(self, f):
+        self.f = f
+        self.memo = {}
+        self.seen = set()
+
+    def __call__(self, board: Board, player: int, depth: int):
+        # ignore depth for identifier
+        identifier = str(player) + str(board)
+        if identifier in self.seen:
+            return 0
+        # ones we are working on right now, this is an infinite loop
+        self.seen.add(identifier)
+        if identifier not in self.memo:
+            self.memo[identifier] = self.f(board, player, depth)
+        # Warning: You may wish to do a deepcopy here if returning objects
+        return self.memo[identifier]
+
+
+
 
 class Memoize:
     def __init__(self, f):
@@ -157,6 +185,35 @@ def update_array(to_update, source):
 
 
 MAX_DEPTH = 4
+
+@MemoizeAverageValue
+def knuclebones_recursive_average_value(board: Board, player: int, depth: int) -> dict:
+    average_value = 0
+    if depth > MAX_DEPTH:
+        # say the one with the higher score won
+        score_difference_from_player_0 = board.get_score_difference(0)
+        return score_difference_from_player_0
+
+    if board.is_over():
+        score_difference_from_player_0 = board.get_score_difference(0)
+        return score_difference_from_player_0
+    # make all the moves with all the dice possible
+    # at max this is 6 * 3, branching factor of 18, not that bad
+    # the dice is known when making the move so it will
+    # be our first level
+    values_below = []
+    for roll in range(1, 7):
+        for move in board.get_valid_moves(player):
+            new_board = copy.deepcopy(board)
+            new_board.insert_col(player, move, roll)
+            move_roll_value = knuclebones_recursive_average_value(
+                new_board, other_player(player), depth + 1
+            )
+            values_below.append(move_roll_value)
+
+    # return average of all values below this point
+    return sum(values_below)/(len(values_below)+1)
+
 
 
 @Memoize
@@ -188,6 +245,25 @@ def knuclebones_recursive(board: Board, player: int, depth: int) -> dict:
 
 def other_player(player: int) -> int:
     return (player + 1) % 2
+
+def get_best_move_average_value(board: Board, player: int, number_rolled: int):
+    moves = {}
+    for move in board.get_valid_moves(player):
+        new_board = copy.deepcopy(board)
+        new_board.insert_col(player, move, number_rolled)
+        moves[move] = knuclebones_recursive_average_value(new_board, other_player(player), 0)
+
+    print(moves)
+    # find the move that has the highest average value
+    best_move = 0
+    best_move_value = moves[0]
+    for move, value in moves.items():
+        if value > best_move_value:
+            best_move = move
+            best_move_value = value
+
+    print(f"Pick {best_move} to have an average value of {best_move_value}")
+    return best_move
 
 
 def get_best_move(board: Board, player: int, number_rolled: int):

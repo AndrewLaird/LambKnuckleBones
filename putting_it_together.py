@@ -1,7 +1,7 @@
 from screenshot import read_board, click_board
 import pyautogui
 import random
-from environment import Board, get_best_move
+from environment import Board, get_best_move, get_best_move_average_value
 
 import time
 
@@ -23,8 +23,8 @@ def play_turn():
     if(len(actions) ==0):
         raise Exception
     print("Thinking....")
-    #action = get_best_move(board, player, rolled_num)
-    action = actions[random.randint(0,len(actions)-1)]
+    action = get_best_move_average_value(board, player, rolled_num)
+    #action = actions[random.randint(0,len(actions)-1)]
     parsed_board, rolled_num, game_over, winner = read_board()
     # make sure the game isn't over
     if not game_over:
@@ -37,6 +37,7 @@ def nuclear():
     pyautogui.press("e")
 
 def start_game():
+    print("Select Opponent")
     # press e on the table
     pyautogui.press("e")
     # left 3
@@ -52,10 +53,12 @@ def start_game():
     # wait
     time.sleep(1)
     # play
+    print("Start game")
     for i in range(50):
         try:
             game_over, winner = play_turn()
-        except:
+        except Exception as e:
+            print(f"we got exception {e}")
             nuclear()
             return 
         if(game_over):
