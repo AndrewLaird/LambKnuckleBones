@@ -117,8 +117,8 @@ class Board:
             + "\n"
             + self.repr_player(0)
         )
-
-
+    
+    
 def knucklebones():
     player = 0
     board = Board()
