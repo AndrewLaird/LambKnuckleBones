@@ -6,7 +6,7 @@ from knucklebones import Board
 class Agent(ABC):
 
     @abstractmethod
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
+    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int) -> int:
         """
         player: 0 or 1 denoting which side of the board you're on
         board: shape(2,3,3), board[0] is player0's 3x3 board
@@ -51,8 +51,3 @@ class DepthAgent(Agent):
         # Look at all 18 actions that can come off this action and 
         pass
 
-class MctsAgent(Agent):
-    """
-    MonteCarlo Tree Search
-    """
-    def 
