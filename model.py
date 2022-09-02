@@ -1,9 +1,13 @@
+from copy import deepcopy
+from typing import Any
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
 from datapoint import DataPoint
+from knucklebones import KnuckleBonesUtils
 
 device = "cpu"  # gpu_0
 
@@ -44,6 +48,7 @@ class ValueModel(nn.Module):
         self.fc5 = nn.Linear(128, 1)
         self.loss = nn.MSELoss()
         self.optimizer = optim.Adam(self.parameters(), lr=0.001)
+        self.gamma = .9
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
@@ -61,25 +66,42 @@ class ValueModel(nn.Module):
         x = self.fc4(x)
         return self.fc5(x)
 
+    def average_all_possible_next_rolls(self, board: Any):
+        possible_next_boards =  [self.forward(torch.tensor(board), i) for i in range(1,7)]
+        return sum(possible_next_boards)/len(possible_next_boards)
+
+    def get_all_next_move_q_values(self, datapoint: DataPoint):
+        # take all the moves
+        result = []
+        board, number_rolled = datapoint.state
+        for move in KnuckleBonesUtils.get_valid_moves(board, datapoint.current_player):
+            next_board = KnuckleBonesUtils.insert_col(deepcopy(board), datapoint.current_player,  number_rolled, move)
+            result.append(self.average_all_possible_next_rolls(next_board))
+        return result
+
     def train(self, training_data: list[DataPoint]):
         # start loss at zero
         for i in range(10):
             self.optimizer.zero_grad()
             total_loss = 0
-            model_values, true_values = torch.Tensor(), torch.Tensor()
+            model_values, target_values = torch.Tensor(), torch.Tensor()
             for datapoint in training_data:
                 board, number_rolled = datapoint.state
 
                 # run it through the network to get what it thinks it should be
                 model_value = self.forward(torch.tensor(board), number_rolled)
                 # get it's true value form bellman (hear me out, just use value for now)
-                true_value = torch.tensor([datapoint.reward], dtype=torch.float)
+                q_target = torch.tensor([datapoint.reward], dtype=torch.float)
+
+                q_s_prime_a_prime = self.get_all_next_move_q_values(datapoint)
+
+                q_target = q_target + self.gamma*np.max(q_s_prime_a_prime)
                 model_values = torch.cat((model_values, model_value))
-                true_values = torch.cat((true_values, true_value))
+                target_values = torch.cat((target_values, q_target))
 
             # set loss equal to MSE between those
             # total_loss += self.loss(model_value, true_value)
-            total_loss = self.loss(model_values, true_values)
+            total_loss = self.loss(model_values, target_values)
 
             # recompute the weights
             print("total loss:", total_loss)

@@ -57,6 +57,7 @@ if __name__ == "__main__":
             winner, training_data = run_arena(
                 value_agent, random_agent, render=i >= 299
             )
+            print(training_data)
         else:
             winner, training_data = run_arena(
                 random_agent, value_agent, render=i >= 299
