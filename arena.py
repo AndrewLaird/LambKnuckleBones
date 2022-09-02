@@ -42,6 +42,7 @@ def run_arena(player0: Agent, player1: Agent, render=False):
         # do we train on ties?
         return reward, []
     training_data = update_training_data(training_data, reward)
+
     return board.get_winner(), training_data
 
 
@@ -62,4 +63,5 @@ if __name__ == "__main__":
             )
             winner = {0: 1, 1: 0, 2: 2}[winner]
         winning[winner] += 1
+        print(training_data)
     print(winning)

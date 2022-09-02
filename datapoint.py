@@ -41,6 +41,10 @@ def update_training_data(training_data: list[DataPoint], reward: float):
     # replace with real belman
     # currently it is just 1 for winnning moves and -1 for lossing moves, no ties given
     for training_point in training_data[::-1]:
-        training_point.reward = reward
-        reward = -reward
+        winner = KnuckleBonesUtils.get_winner(training_point.next_state[0])
+        
+        if winner == training_point.current_player:
+            training_point.reward = 1000
+        else:
+            training_point.reward = KnuckleBonesUtils.get_score_difference(training_point.next_state[0], training_point.current_player)
     return training_data
