@@ -48,7 +48,7 @@ class ValueModel(nn.Module):
         self.fc5 = nn.Linear(128, 1)
         self.loss = nn.MSELoss()
         self.optimizer = optim.Adam(self.parameters(), lr=0.001)
-        self.gamma = .9
+        self.gamma = 0.9
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
@@ -67,16 +67,21 @@ class ValueModel(nn.Module):
         return self.fc5(x)
 
     def average_all_possible_next_rolls(self, board: Any):
-        possible_next_boards =  [self.forward(torch.tensor(board), i) for i in range(1,7)]
-        return sum(possible_next_boards)/len(possible_next_boards)
+        possible_next_boards = [
+            self.forward(torch.tensor(board), i).detach() for i in range(1, 7)
+        ]
+        return sum(possible_next_boards) / len(possible_next_boards)
 
     def get_all_next_move_q_values(self, datapoint: DataPoint):
         # take all the moves
         result = []
         board, number_rolled = datapoint.state
         for move in KnuckleBonesUtils.get_valid_moves(board, datapoint.current_player):
-            next_board = KnuckleBonesUtils.insert_col(deepcopy(board), datapoint.current_player,  number_rolled, move)
-            result.append(self.average_all_possible_next_rolls(next_board))
+            if not KnuckleBonesUtils.is_over(board):
+                next_board = KnuckleBonesUtils.insert_col(
+                    deepcopy(board), datapoint.current_player, move, number_rolled
+                )
+                result.append(self.average_all_possible_next_rolls(next_board))
         return result
 
     def train(self, training_data: list[DataPoint]):
@@ -95,7 +100,7 @@ class ValueModel(nn.Module):
 
                 q_s_prime_a_prime = self.get_all_next_move_q_values(datapoint)
 
-                q_target = q_target + self.gamma*np.max(q_s_prime_a_prime)
+                q_target = q_target + self.gamma * np.max(q_s_prime_a_prime)
                 model_values = torch.cat((model_values, model_value))
                 target_values = torch.cat((target_values, q_target))
 
