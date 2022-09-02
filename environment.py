@@ -71,9 +71,9 @@ class Board:
     def get_score_difference(self, player):
         player0_score = self.get_score(0)
         player1_score = self.get_score(1)
-        difference = player0_score-player1_score
-        if(player):
-            return - difference
+        difference = player0_score - player1_score
+        if player:
+            return -difference
         return difference
 
     def delete_values_matching_in_column(self, player, col, value):
@@ -117,8 +117,8 @@ class Board:
             + "\n"
             + self.repr_player(0)
         )
-    
-    
+
+
 def knucklebones():
     player = 0
     board = Board()
@@ -138,6 +138,7 @@ class Outcomes(int, Enum):
     PLAYER0 = 0
     PLAYER1 = 1
 
+
 class MemoizeAverageValue:
     def __init__(self, f):
         self.f = f
@@ -155,8 +156,6 @@ class MemoizeAverageValue:
             self.memo[identifier] = self.f(board, player, depth)
         # Warning: You may wish to do a deepcopy here if returning objects
         return self.memo[identifier]
-
-
 
 
 class Memoize:
@@ -186,6 +185,7 @@ def update_array(to_update, source):
 
 MAX_DEPTH = 4
 
+
 @MemoizeAverageValue
 def knuclebones_recursive_average_value(board: Board, player: int, depth: int) -> dict:
     average_value = 0
@@ -212,8 +212,7 @@ def knuclebones_recursive_average_value(board: Board, player: int, depth: int) -
             values_below.append(move_roll_value)
 
     # return average of all values below this point
-    return sum(values_below)/(len(values_below)+1)
-
+    return sum(values_below) / (len(values_below) + 1)
 
 
 @Memoize
@@ -246,12 +245,15 @@ def knuclebones_recursive(board: Board, player: int, depth: int) -> dict:
 def other_player(player: int) -> int:
     return (player + 1) % 2
 
+
 def get_best_move_average_value(board: Board, player: int, number_rolled: int):
     moves = {}
     for move in board.get_valid_moves(player):
         new_board = copy.deepcopy(board)
         new_board.insert_col(player, move, number_rolled)
-        moves[move] = knuclebones_recursive_average_value(new_board, other_player(player), 0)
+        moves[move] = knuclebones_recursive_average_value(
+            new_board, other_player(player), 0
+        )
 
     print(moves)
     # find the move that has the highest average value
@@ -314,7 +316,7 @@ def play_against_knucklebones_ai():
 
 def collect_data():
     outcomes = {Outcomes.TIE: 0, Outcomes.PLAYER1: 0, Outcomes.PLAYER1: 0}
-    #5% 65% 30%
+    # 5% 65% 30%
     for i in range(1000):
         winner = play_against_knucklebones_ai()
         outcomes[winner] += 1

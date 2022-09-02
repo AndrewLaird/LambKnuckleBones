@@ -23,11 +23,11 @@ class KnuckleBonesUtils:
     """
     Collection of static methods to create knuclebones game
     """
-    EMPTY_BOARD = [
-            [[0 for row in range(BOARD_HEIGHT)] for col in range(BOARD_WIDTH)]
-            for player_board in range(2)
-    ]
 
+    EMPTY_BOARD = [
+        [[0 for row in range(BOARD_HEIGHT)] for col in range(BOARD_WIDTH)]
+        for player_board in range(2)
+    ]
 
     @staticmethod
     def other_player(player: int) -> int:
@@ -64,7 +64,9 @@ class KnuckleBonesUtils:
             )
 
         # update the enemy side
-        board = KnuckleBonesUtils.delete_values_matching_in_column(board, KnuckleBonesUtils.other_player(player), col, value)
+        board = KnuckleBonesUtils.delete_values_matching_in_column(
+            board, KnuckleBonesUtils.other_player(player), col, value
+        )
         return board
 
     @staticmethod
@@ -94,21 +96,22 @@ class KnuckleBonesUtils:
         """
         One person has a fully filled board
         """
-        if not KnuckleBonesUtils.get_valid_moves(board, 0) or not KnuckleBonesUtils.get_valid_moves(board, 1):
+        if not KnuckleBonesUtils.get_valid_moves(
+            board, 0
+        ) or not KnuckleBonesUtils.get_valid_moves(board, 1):
             return True
         return False
 
     @staticmethod
-    def get_winner(board)-> int:
-        if(not KnuckleBonesUtils.is_over(board)):
-            return 3# shouldn't be called 
+    def get_winner(board) -> int:
+        if not KnuckleBonesUtils.is_over(board):
+            return 3  # shouldn't be called
         score_difference = KnuckleBonesUtils.get_score_difference(board, 0)
-        if(score_difference == 0):
+        if score_difference == 0:
             return 2
-        if(score_difference > 0):
+        if score_difference > 0:
             return 0
         return 1
-        
 
     @staticmethod
     def repr_player(board, player, reverse_rows=False) -> str:
@@ -137,16 +140,24 @@ class KnuckleBonesUtils:
             + "\n"
             + KnuckleBonesUtils.repr_player(board, 0)
         )
+
     @staticmethod
     def get_dice_roll() -> int:
-        return random.randrange(1,7)
+        return random.randrange(1, 7)
+
+    @staticmethod
+    def flatten_board(board) -> list[int]:
+        # turns [3,3,2] to [18,1]
+        return list(np.array(board).flatten())
+
 
 class Board:
     """
     Handy class with state that uses the staticmethods from above
     """
+
     def __init__(self, board=None):
-        if(board is not None):
+        if board is not None:
             self.board = board
         else:
             self.board = copy.deepcopy(KnuckleBonesUtils.EMPTY_BOARD)
@@ -161,12 +172,13 @@ class Board:
         self.board = KnuckleBonesUtils.insert_col(self.board, player, col, value)
         return self.board
 
-
     def get_score_difference(self, player):
         return KnuckleBonesUtils.get_score_difference(self.board, player)
 
     def delete_values_matching_in_column(self, player, col, value):
-        self.board = KnuckleBonesUtils.delete_values_matching_in_column(self.board, player, col, value)
+        self.board = KnuckleBonesUtils.delete_values_matching_in_column(
+            self.board, player, col, value
+        )
         return self.board
 
     @property

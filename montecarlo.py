@@ -9,14 +9,15 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 import math
 
+
 class MCTS:
     "Monte Carlo tree searcher. First rollout the tree then choose a move."
 
     def __init__(self, exploration_weight=1):
         self.Q = defaultdict(int)  # total reward of each node
         self.N: dict[int, int] = defaultdict(int)  # total visit count for each node
-        self.children: dict[Node, set[Node]]  = dict()  # children of each node
-        self.exploration_weight = exploration_weight # value probably 0->1
+        self.children: dict[Node, set[Node]] = dict()  # children of each node
+        self.exploration_weight = exploration_weight  # value probably 0->1
 
     def choose(self, node):
         "Choose the best successor of node. (Choose a move in the game)"
@@ -47,12 +48,14 @@ class MCTS:
         path = []
         while True:
             path.append(node)
-            #self.children.keys() is visited nodes
-            if not (node in self.children.keys() and self.children[node]): #self loop
+            # self.children.keys() is visited nodes
+            if not (node in self.children.keys() and self.children[node]):  # self loop
                 # node is either unexplored or terminal
                 return path
             # set(A,B,C) - set(A,C) = set(B)
-            unexplored = self.children[node] - self.children.keys() # set(Node) - set(Node)
+            unexplored = (
+                self.children[node] - self.children.keys()
+            )  # set(Node) - set(Node)
             if unexplored:
                 n = unexplored.pop()
                 path.append(n)
@@ -74,7 +77,7 @@ class MCTS:
                 # reward is expected to be between 0 and 1
                 return 1 - reward if invert_reward else reward
             node = node.find_random_child()
-            invert_reward = not invert_reward 
+            invert_reward = not invert_reward
 
     def _backpropagate(self, path, reward):
         "Send the reward back up to the ancestors of the leaf"
@@ -94,7 +97,8 @@ class MCTS:
         def uct(n):
             "Upper confidence bound for trees"
             return self.Q[n] / self.N[n] + self.exploration_weight * math.sqrt(
-                log_N_vertex / self.N[n] # how much we've visited compared to all other child nodes
+                log_N_vertex
+                / self.N[n]  # how much we've visited compared to all other child nodes
             )
 
         return max(self.children[node], key=uct)
@@ -137,5 +141,3 @@ class Node(ABC):
     def __eq__(node1, node2):
         "Nodes must be comparable"
         return True
-
-

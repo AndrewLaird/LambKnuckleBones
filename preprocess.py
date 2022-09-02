@@ -7,10 +7,10 @@ import skimage.filters
 # load the image
 
 
-for dice in range(1,7):
+for dice in range(1, 7):
     # Open the image
     image = skimage.io.imread(f"dice/{dice}_reg.png")
-    image_without_alpha = image[:,:,:3]
+    image_without_alpha = image[:, :, :3]
 
     # convert the image to grayscale
     gray_image = skimage.color.rgb2gray(image_without_alpha)
@@ -24,4 +24,3 @@ for dice in range(1,7):
     plt.imshow(binary_mask, cmap="gray")
     plt.show()
     skimage.io.imsave(f"dice/{dice}_masked.png", binary_mask)
-

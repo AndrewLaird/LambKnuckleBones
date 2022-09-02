@@ -102,8 +102,8 @@ def students_t_test(screenshot):
     T_on_screen = screenshot.crop(
         box=(top_left[0], top_left[1], bottom_right[0], bottom_right[1])
     )
-    T_on_file = process_image(np.array(T_on_file)[:,:,:3])
-    T_on_screen = process_image(np.array(T_on_screen)[:,:,:3])
+    T_on_file = process_image(np.array(T_on_file)[:, :, :3])
+    T_on_screen = process_image(np.array(T_on_screen)[:, :, :3])
     # difference
 
     T_on_file_np = np.array(T_on_file)
