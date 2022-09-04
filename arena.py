@@ -40,7 +40,7 @@ def run_arena(player0: Agent, player1: Agent, render=False):
         current_player = KnuckleBonesUtils.other_player(current_player)
         number_rolled = new_number_rolled
     reward = board.get_winner()
-    if reward == 0:
+    if reward == 2:
         # do we train on ties?
         return reward, []
     training_data = update_training_data(training_data, reward)
@@ -52,6 +52,7 @@ if __name__ == "__main__":
     random_agent = RandomAgent()
     default_model_agent = ModelAgent()
     value_agent = ValueAgent()
+    value_agent.load("value_agent.pt")
 
     winning = {0: 0, 1: 0, 2: 0}
     for i in range(300):
@@ -59,12 +60,11 @@ if __name__ == "__main__":
             winner, training_data = run_arena(
                 value_agent, random_agent, render=i >= 299
             )
-            print(training_data)
         else:
             winner, training_data = run_arena(
                 random_agent, value_agent, render=i >= 299
             )
             winner = {0: 1, 1: 0, 2: 2}[winner]
+
         winning[winner] += 1
-        print(training_data)
     print(winning)
