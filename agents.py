@@ -2,11 +2,12 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from copy import deepcopy
 import numpy as np
-from model import DefaultModel, ValueModel
+from model import DefaultModel, ValueModel, state_to_tensor
 import random
 from knucklebones import Board, KnuckleBonesUtils
 import torch
 from datapoint import DataPoint
+
 
 # abstract class
 class Agent(ABC):
@@ -114,6 +115,8 @@ class ModelAgent(Agent):
 class ValueAgent(Agent):
     def __init__(self):
         self.value_model = ValueModel()
+        self.action_requests = {}
+        self.all_actions = {}
         pass
 
     def save(self, name):
@@ -143,7 +146,7 @@ class ValueAgent(Agent):
             # get expected value for all_s_prime
             s_prime_values = [
                 self.value_model.forward(
-                    torch.tensor(board), number_rolled
+                    state_to_tensor(board, number_rolled)
                 ).detach()  # captures actual value
                 for board, number_rolled in all_s_primes
             ]
@@ -158,6 +161,15 @@ class ValueAgent(Agent):
             move = valid_moves[random.randint(0, len(valid_moves) - 1)]
 
         return move
+    
+    def request_action(self, game_num:int , player: int, board: list[list[list[int]]], number_rolled: int):
+        self.action_requests[game_num] = (player, board, number_rolled)
+
+    def exectute_all_requests(self):
+        pass
+
+    def read_action(self, game_num):
+        return self.all_actions[game_num]
 
     def train(self, training_data: list[DataPoint]):
         self.value_model.train(training_data)

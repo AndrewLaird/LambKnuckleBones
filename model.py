@@ -10,6 +10,18 @@ from datapoint import DataPoint
 from knucklebones import KnuckleBonesUtils
 
 device = "cpu"  # gpu_0
+if(torch.cuda.is_available()):
+    device = torch.cuda.get_device_name(0)
+print(f"using device {device}")
+
+def state_to_tensor(board: Any, number_rolled: int):
+        x = torch.Tensor(board)
+        x = torch.reshape(x, (-1,))
+        # reshape to [18,1]
+        # add dice
+        x = torch.cat([x, torch.tensor([number_rolled], dtype=torch.float)])
+        return x
+
 
 
 class DefaultModel(nn.Module):
@@ -52,14 +64,7 @@ class ValueModel(nn.Module):
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
-    def forward(self, x: torch.Tensor, die: int):
-        # Input size is [2,3,3] + 1 die
-        # reshape to [9,2]
-        x = torch.reshape(x, (-1,))
-        # reshape to [18,1]
-        # add dice
-        x = torch.cat([x, torch.tensor([die], dtype=torch.float)])
-        # 19,1
+    def forward(self, x: torch.Tensor):
         x = self.fc1(x)
         x = self.fc2(x)
         x = self.fc3(x)
@@ -68,7 +73,7 @@ class ValueModel(nn.Module):
 
     def average_all_possible_next_rolls(self, board: Any):
         possible_next_boards = [
-            self.forward(torch.tensor(board), i).detach() for i in range(1, 7)
+            self.forward(state_to_tensor(board, i)).detach() for i in range(1, 7)
         ]
         return sum(possible_next_boards) / len(possible_next_boards)
 
@@ -90,18 +95,20 @@ class ValueModel(nn.Module):
             self.optimizer.zero_grad()
             total_loss = 0
             model_values, target_values = torch.Tensor(), torch.Tensor()
+            all_known_states = torch.stack([state_to_tensor(*datapoint.state) for datapoint in training_data])
+            
+            model_values = self.forward(all_known_states)
             for datapoint in training_data:
-                board, number_rolled = datapoint.state
+                #board, number_rolled = datapoint.state
 
                 # run it through the network to get what it thinks it should be
-                model_value = self.forward(torch.tensor(board), number_rolled)
+                #model_value = self.forward(state_to_tensor(board, number_rolled))
                 # get it's true value form bellman (hear me out, just use value for now)
                 q_target = torch.tensor([datapoint.reward], dtype=torch.float)
 
                 q_s_prime_a_prime = self.get_all_next_move_q_values(datapoint)
 
                 q_target = q_target + self.gamma * np.max(q_s_prime_a_prime)
-                model_values = torch.cat((model_values, model_value))
                 target_values = torch.cat((target_values, q_target))
 
             # set loss equal to MSE between those
@@ -113,16 +120,3 @@ class ValueModel(nn.Module):
             if torch.is_tensor(total_loss):
                 total_loss.backward()
                 self.optimizer.step()
-
-
-if __name__ == "__main__":
-    board = [[[0 for row in range(3)] for col in range(3)] for player_board in range(2)]
-    my_torch_tensor = torch.tensor(board, dtype=torch.float)
-    print(my_torch_tensor)
-    print(my_torch_tensor.shape)
-    my_default = DefaultModel()
-    print(my_default.forward(my_torch_tensor, 5))
-
-    # produce outputs for every state and compare them against reward
-    # to produce loss
-    # then backprop

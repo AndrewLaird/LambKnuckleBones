@@ -5,12 +5,13 @@ if __name__ == "__main__":
     random_agent = RandomAgent()
     value_agent = ValueAgent()
 
-    # value_agent.load("value_agent.pt")
+    value_agent.load("value_agent.pt")
 
     all_training_data = []
     epochs = 0
     while True:  # goodbye cpu
         print(epochs)
+        # play all 100 games at once
         for i in range(100):
             winner, training_data = run_arena(value_agent, value_agent, render=False)
             all_training_data.extend(training_data)
