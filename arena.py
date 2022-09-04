@@ -5,7 +5,7 @@ from knucklebones import Board, KnuckleBonesUtils
 from agents import Agent, RandomAgent, ModelAgent, ValueAgent
 from datapoint import DataPoint, update_training_data
 
-def parallel_arena(player0: Agent, player1: Agent, render=False):
+def parallel_arena(num_games, player0: Agent, player1: Agent, render=False):
     pass
 
 def run_arena(player0: Agent, player1: Agent, render=False):

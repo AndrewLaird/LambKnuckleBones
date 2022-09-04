@@ -135,9 +135,7 @@ class ValueAgent(Agent):
 
     def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
 
-        # [0,2]
         valid_moves = KnuckleBonesUtils.get_valid_moves(board, player)
-        # [3,1]
         move_expected_values = defaultdict(float)
         for valid_move in valid_moves:
             all_s_primes = self.get_possible_states_from_state_action(

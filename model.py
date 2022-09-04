@@ -73,7 +73,7 @@ class ValueModel(nn.Module):
 
     def average_all_possible_next_rolls(self, board: Any):
         possible_next_boards = [
-            self.forward(state_to_tensor(board, i)).detach() for i in range(1, 7)
+            state_to_tensor(board, i) for i in range(1, 7)
         ]
         return sum(possible_next_boards) / len(possible_next_boards)
 
@@ -87,7 +87,7 @@ class ValueModel(nn.Module):
                     deepcopy(board), datapoint.current_player, move, number_rolled
                 )
                 result.append(self.average_all_possible_next_rolls(next_board))
-        return result
+        return self.forward(torch.stack(result)).detach()
 
     def train(self, training_data: list[DataPoint]):
         # start loss at zero
@@ -108,11 +108,12 @@ class ValueModel(nn.Module):
 
                 q_s_prime_a_prime = self.get_all_next_move_q_values(datapoint)
 
-                q_target = q_target + self.gamma * np.max(q_s_prime_a_prime)
+                q_target = q_target + self.gamma * torch.max(q_s_prime_a_prime)
                 target_values = torch.cat((target_values, q_target))
 
             # set loss equal to MSE between those
             # total_loss += self.loss(model_value, true_value)
+            target_values = target_values.unsqueeze(-1)
             total_loss = self.loss(model_values, target_values)
 
             # recompute the weights
