@@ -10,18 +10,20 @@ from datapoint import DataPoint
 from knucklebones import KnuckleBonesUtils
 
 device = "cpu"  # gpu_0
-if(torch.cuda.is_available()):
-    device = torch.cuda.get_device_name(0)
+if torch.cuda.is_available():
+    device_name = torch.cuda.get_device_name(0)
+    print("found device", device_name)
+    device = torch.device("cuda")
 print(f"using device {device}")
 
-def state_to_tensor(board: Any, number_rolled: int):
-        x = torch.Tensor(board)
-        x = torch.reshape(x, (-1,))
-        # reshape to [18,1]
-        # add dice
-        x = torch.cat([x, torch.tensor([number_rolled], dtype=torch.float)])
-        return x
 
+def state_to_tensor(board: Any, number_rolled: int):
+    x = torch.Tensor(board)
+    x = torch.reshape(x, (-1,))
+    # reshape to [18,1]
+    # add dice
+    x = torch.cat([x, torch.tensor([number_rolled], dtype=torch.float)])
+    return x
 
 
 class DefaultModel(nn.Module):
@@ -53,28 +55,38 @@ class ValueModel(nn.Module):
         super(ValueModel, self).__init__()
         # Input size is [2,3,3]
         self.fc1 = nn.Linear(19, 128)
-        # Second fully connected layer that outputs our 10 labels
+        self.norm1 = nn.BatchNorm1d(128, affine=False)
         self.fc2 = nn.Linear(128, 1024)
+        self.norm2 = nn.BatchNorm1d(1024, affine=False)
         self.fc3 = nn.Linear(1024, 1024)
-        self.fc4 = nn.Linear(1024, 128)
-        self.fc5 = nn.Linear(128, 1)
+        self.norm3 = nn.BatchNorm1d(1024, affine=False)
+        self.fc4 = nn.Linear(1024, 1024)
+        self.norm4 = nn.BatchNorm1d(1024, affine=False)
+        self.fc5 = nn.Linear(1024, 1024)
+        self.norm5 = nn.BatchNorm1d(1024, affine=False)
+        self.fc6 = nn.Linear(1024, 128)
+        self.norm6 = nn.BatchNorm1d(128, affine=False)
+        self.fc7 = nn.Linear(128, 1)
         self.loss = nn.MSELoss()
-        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
+        self.optimizer = optim.Adam(self.parameters(), lr=0.01)
         self.gamma = 0.9
+        self.to(device)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, x: torch.Tensor):
-        x = self.fc1(x)
-        x = self.fc2(x)
-        x = self.fc3(x)
-        x = self.fc4(x)
-        return self.fc5(x)
+        x = x.to(device)
+        x = self.norm1(self.fc1(x))
+        x = self.norm2(self.fc2(x))
+        x = self.norm3(self.fc3(x))
+        x = self.norm4(self.fc4(x))
+        x = self.norm5(self.fc5(x))
+        x = self.norm6(self.fc6(x))
+        x = self.fc7(x)
+        return x
 
     def average_all_possible_next_rolls(self, board: Any):
-        possible_next_boards = [
-            state_to_tensor(board, i) for i in range(1, 7)
-        ]
+        possible_next_boards = [state_to_tensor(board, i) for i in range(1, 7)]
         return sum(possible_next_boards) / len(possible_next_boards)
 
     def get_all_next_move_q_values(self, datapoint: DataPoint):
@@ -89,31 +101,39 @@ class ValueModel(nn.Module):
                 result.append(self.average_all_possible_next_rolls(next_board))
         return self.forward(torch.stack(result)).detach()
 
-    def train(self, training_data: list[DataPoint]):
+    def calculate_targets(self, training_data: list[DataPoint]):
+        self.train(False)
+        target_values = torch.Tensor().to(device)
+        for datapoint in training_data:
+            # board, number_rolled = datapoint.state
+
+            # run it through the network to get what it thinks it should be
+            # model_value = self.forward(state_to_tensor(board, number_rolled))
+            # get it's true value form bellman (hear me out, just use value for now)
+            q_target = torch.tensor([datapoint.reward], dtype=torch.float).to(device)
+
+            q_s_prime_a_prime = self.get_all_next_move_q_values(datapoint)
+
+            q_target = q_target + self.gamma * torch.max(q_s_prime_a_prime)
+            target_values = torch.cat((target_values, q_target))
+        self.train(True)
+        target_values = target_values.unsqueeze(-1)
+        return target_values
+
+    def train_with_data(self, training_data: list[DataPoint]):
         # start loss at zero
-        for i in range(10):
+        target_values = self.calculate_targets(training_data)
+
+        for i in range(100):
             self.optimizer.zero_grad()
             total_loss = 0
-            model_values, target_values = torch.Tensor(), torch.Tensor()
-            all_known_states = torch.stack([state_to_tensor(*datapoint.state) for datapoint in training_data])
-            
+            all_known_states = torch.stack(
+                [state_to_tensor(*datapoint.state) for datapoint in training_data]
+            )
+
             model_values = self.forward(all_known_states)
-            for datapoint in training_data:
-                #board, number_rolled = datapoint.state
-
-                # run it through the network to get what it thinks it should be
-                #model_value = self.forward(state_to_tensor(board, number_rolled))
-                # get it's true value form bellman (hear me out, just use value for now)
-                q_target = torch.tensor([datapoint.reward], dtype=torch.float)
-
-                q_s_prime_a_prime = self.get_all_next_move_q_values(datapoint)
-
-                q_target = q_target + self.gamma * torch.max(q_s_prime_a_prime)
-                target_values = torch.cat((target_values, q_target))
-
-            # set loss equal to MSE between those
+                        # set loss equal to MSE between those
             # total_loss += self.loss(model_value, true_value)
-            target_values = target_values.unsqueeze(-1)
             total_loss = self.loss(model_values, target_values)
 
             # recompute the weights

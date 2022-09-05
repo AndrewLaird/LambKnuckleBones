@@ -7,6 +7,7 @@ import random
 from knucklebones import Board, KnuckleBonesUtils
 import torch
 from datapoint import DataPoint
+import os.path
 
 
 # abstract class
@@ -123,7 +124,8 @@ class ValueAgent(Agent):
         torch.save(self.value_model.state_dict(), name)
 
     def load(self, name):
-        self.value_model.load_state_dict(torch.load(name))
+        if os.path.exists(name):
+            self.value_model.load_state_dict(torch.load(name))
 
     def get_possible_states_from_state_action(
         self, player: int, board: list[list[list[int]]], number_rolled: int, action: int
@@ -134,7 +136,6 @@ class ValueAgent(Agent):
             yield (deepcopy(next_board), i)
 
     def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
-
         valid_moves = KnuckleBonesUtils.get_valid_moves(board, player)
         move_expected_values = defaultdict(float)
         for valid_move in valid_moves:
@@ -142,12 +143,14 @@ class ValueAgent(Agent):
                 player, board, number_rolled, valid_move
             )
             # get expected value for all_s_prime
-            s_prime_values = [
-                self.value_model.forward(
-                    state_to_tensor(board, number_rolled)
-                ).detach()  # captures actual value
-                for board, number_rolled in all_s_primes
-            ]
+            s_prime_values = self.value_model.forward(
+                torch.stack(
+                    [
+                        state_to_tensor(board, number_rolled)
+                        for board, number_rolled in all_s_primes
+                    ]
+                )
+            ).detach()  # captures actual value
             # return average value of them
             move_expected_values[valid_move] = sum(
                 [float(x) for x in s_prime_values]
@@ -159,8 +162,14 @@ class ValueAgent(Agent):
             move = valid_moves[random.randint(0, len(valid_moves) - 1)]
 
         return move
-    
-    def request_action(self, game_num:int , player: int, board: list[list[list[int]]], number_rolled: int):
+
+    def request_action(
+        self,
+        game_num: int,
+        player: int,
+        board: list[list[list[int]]],
+        number_rolled: int,
+    ):
         self.action_requests[game_num] = (player, board, number_rolled)
 
     def exectute_all_requests(self):
@@ -169,5 +178,5 @@ class ValueAgent(Agent):
     def read_action(self, game_num):
         return self.all_actions[game_num]
 
-    def train(self, training_data: list[DataPoint]):
-        self.value_model.train(training_data)
+    def train_with_data(self, training_data: list[DataPoint]):
+        self.value_model.train_with_data(training_data)
