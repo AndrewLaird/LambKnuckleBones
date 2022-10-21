@@ -1,182 +1,134 @@
-from abc import ABC, abstractmethod
-from collections import defaultdict
 from copy import deepcopy
+from typing import Any
 import numpy as np
-from model import DefaultModel, ValueModel, state_to_tensor
-import random
-from knucklebones import Board, KnuckleBonesUtils
 import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+import torchvision.transforms as T
 from datapoint import DataPoint
-import os.path
+from knucklebones import KnuckleBonesUtils
+
+device = "cpu"  # gpu_0
+if torch.cuda.is_available():
+    device_name = torch.cuda.get_device_name(0)
+    print("found device", device_name)
+    device = torch.device("cuda")
+print(f"using device {device}")
 
 
-# abstract class
-class Agent(ABC):
-    @abstractmethod
-    def get_action(
-        self, player: int, board: list[list[list[int]]], number_rolled: int
-    ) -> int:
-        """
-        player: 0 or 1 denoting which side of the board you're on
-        board: shape(2,3,3), board[0] is player0's 3x3 board
-        number_rolled: 1-6 the dice you get to place this turn
-        """
-        pass
+def state_to_tensor(board: Any, number_rolled: int):
+    x = torch.Tensor(board)
+    x = torch.reshape(x, (-1,))
+    # reshape to [18,1]
+    # add dice
+    x = torch.cat([x, torch.tensor([number_rolled], dtype=torch.float)])
+    return x
 
 
-"""
-[
-    [ Player 0
-        [0,0,0], column 0
-        [0,0,0], column 1
-        [0,0,0] colum 2
-    ],
-    [ Player 1
-        [0,0,0],
-        [0,0,0],
-        [0,0,0]
-    ]
-
-]
-
-"""
-
-
-class RandomAgent(Agent):
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
-        board_obj = Board(board)
-        valid_moves = board_obj.get_valid_moves(player)
-        return valid_moves[random.randint(0, len(valid_moves) - 1)]
-
-
-class DepthAgent(Agent):
+class DefaultModel(nn.Module):
     def __init__(self):
-        self.visited = {}
-        self.max_depth = 3
+        super(DefaultModel, self).__init__()
+        # Input size is [2,3,3]
+        self.fc1 = nn.Linear(19, 128)
+        # Second fully connected layer that outputs our 10 labels
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 3)
 
-    def get_position_value(self, player, board, depth):
-        pass
+    # Called with either one element to determine next action, or a batch
+    # during optimization. Returns tensor([[left0exp,right0exp]...]).
+    def forward(self, x: torch.Tensor, die: int):
+        # Input size is [2,3,3] + 1 die
+        # reshape to [9,2]
+        x = torch.reshape(x, (-1,))
+        # reshape to [18,1]
+        # add dice
+        x = torch.cat([x, torch.tensor([die], dtype=torch.float)])
+        # 19,1
+        x = self.fc1(x)
+        x = self.fc2(x)
+        return self.fc3(x)
 
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
-        # Create function to get the average score of position
-        # Look at all 18 actions that can come off this action and
-        pass
 
-
-class BellmanAgent(Agent):
+class ValueModel(nn.Module):
     def __init__(self):
-        pass
+        super(ValueModel, self).__init__()
+        # Input size is [2,3,3]
+        self.fc1 = nn.Linear(19, 128)
+        self.norm1 = nn.BatchNorm1d(128, affine=False)
+        self.fc2 = nn.Linear(128, 1024)
+        self.norm2 = nn.BatchNorm1d(1024, affine=False)
+        self.fc3 = nn.Linear(1024, 128)
+        self.norm3 = nn.BatchNorm1d(128, affine=False)
+        self.fc4 = nn.Linear(128, 1)
+        self.loss = nn.MSELoss()
+        self.optimizer = optim.Adam(self.parameters(), lr=0.01)
+        self.gamma = 0.9
+        self.to(device)
 
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
+    # Called with either one element to determine next action, or a batch
+    # during optimization. Returns tensor([[left0exp,right0exp]...]).
+    def forward(self, x: torch.Tensor):
+        x = x.to(device)
+        x = self.norm1(self.fc1(x))
+        x = self.norm2(self.fc2(x))
+        x = self.norm3(self.fc3(x))
+        x = self.fc4(x)
+        return x
 
-        state = KnuckleBonesUtils.flatten_board(board)
-        state.append(number_rolled)
-        # state is now [19,1]
+    def average_all_possible_next_rolls(self, board: Any):
+        possible_next_boards = [state_to_tensor(board, i) for i in range(1, 7)]
+        return sum(possible_next_boards) / len(possible_next_boards)
 
-        pass
-
-
-def normalize_data(data):
-    return (data - np.min(data)) / (np.max(data) - np.min(data))
-
-
-class ModelAgent(Agent):
-    def __init__(self):
-        self.my_default_model = DefaultModel()
-        pass
-
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
-
-        # [0,2]
-        valid_moves = KnuckleBonesUtils.get_valid_moves(board, player)
-        # [3,1]
-        action_probs = self.my_default_model.forward(
-            torch.tensor(board), number_rolled
-        ).detach()
-        # normalize action probs to zero - 1
-        action_probs = normalize_data(list(action_probs))
-        action_probs = [x + 1 for x in action_probs]
-        action_probs = [
-            float(prob) * int(i in valid_moves) for i, prob in enumerate(action_probs)
-        ]
-
-        action = np.argmax(action_probs)
-        return action
-
-    def train(self, training_data: list[DataPoint]):
-
-        # for each datapoint
-        # run it through the network to get what it thinks it should be
-        # get it's true value form bellman (hear me out, just use value for now)
-        # set loss equal to MSE between those
-        # [ ]
-        pass
-
-
-class ValueAgent(Agent):
-    def __init__(self):
-        self.value_model = ValueModel()
-        self.action_requests = {}
-        self.all_actions = {}
-        pass
-
-    def save(self, name):
-        torch.save(self.value_model.state_dict(), name)
-
-    def load(self, name):
-        if os.path.exists(name):
-            self.value_model.load_state_dict(torch.load(name))
-
-    def get_possible_states_from_state_action(
-        self, player: int, board: list[list[list[int]]], number_rolled: int, action: int
-    ):
-        """Get all S' for (s,a)"""
-        next_board = KnuckleBonesUtils.insert_col(board, player, action, number_rolled)
-        for i in range(1, 7):
-            yield (deepcopy(next_board), i)
-
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
-        valid_moves = KnuckleBonesUtils.get_valid_moves(board, player)
-        move_expected_values = defaultdict(float)
-        for valid_move in valid_moves:
-            all_s_primes = self.get_possible_states_from_state_action(
-                player, board, number_rolled, valid_move
-            )
-            # get expected value for all_s_prime
-            s_prime_values = self.value_model.forward(
-                torch.stack(
-                    [
-                        state_to_tensor(board, number_rolled)
-                        for board, number_rolled in all_s_primes
-                    ]
+    def get_all_next_move_q_values(self, datapoint: DataPoint):
+        # take all the moves
+        result = []
+        board, number_rolled = datapoint.state
+        for move in KnuckleBonesUtils.get_valid_moves(board, datapoint.current_player):
+            if not KnuckleBonesUtils.is_over(board):
+                next_board = KnuckleBonesUtils.insert_col(
+                    deepcopy(board), datapoint.current_player, move, number_rolled
                 )
-            ).detach()  # captures actual value
-            # return average value of them
-            move_expected_values[valid_move] = sum(
-                [float(x) for x in s_prime_values]
-            ) / len(s_prime_values)
+                result.append(self.average_all_possible_next_rolls(next_board))
+        return self.forward(torch.stack(result)).detach()
 
-        move = max(move_expected_values, key=move_expected_values.get)
-        if random.random() < 0.1:
-            # explore by randomly selecting a move
-            move = valid_moves[random.randint(0, len(valid_moves) - 1)]
+    def calculate_targets(self, training_data: list[DataPoint]):
+        self.train(False)
+        target_values = torch.Tensor().to(device)
+        for datapoint in training_data:
+            # board, number_rolled = datapoint.state
 
-        return move
+            # run it through the network to get what it thinks it should be
+            # model_value = self.forward(state_to_tensor(board, number_rolled))
+            # get it's true value form bellman (hear me out, just use value for now)
+            q_target = torch.tensor([datapoint.reward], dtype=torch.float).to(device)
 
-    def request_action(
-        self,
-        game_num: int,
-        player: int,
-        board: list[list[list[int]]],
-        number_rolled: int,
-    ):
-        self.action_requests[game_num] = (player, board, number_rolled)
+            q_s_prime_a_prime = self.get_all_next_move_q_values(datapoint)
 
-    def exectute_all_requests(self):
-        pass
-
-    def read_action(self, game_num):
-        return self.all_actions[game_num]
+            q_target = q_target + self.gamma * torch.max(q_s_prime_a_prime)
+            target_values = torch.cat((target_values, q_target))
+        self.train(True)
+        target_values = target_values.unsqueeze(-1)
+        return target_values
 
     def train_with_data(self, training_data: list[DataPoint]):
-        self.value_model.train_with_data(training_data)
+        # start loss at zero
+        target_values = self.calculate_targets(training_data)
+
+        for i in range(100):
+            self.optimizer.zero_grad()
+            total_loss = 0
+            all_known_states = torch.stack(
+                [state_to_tensor(*datapoint.state) for datapoint in training_data]
+            )
+
+            model_values = self.forward(all_known_states)
+                        # set loss equal to MSE between those
+            # total_loss += self.loss(model_value, true_value)
+            total_loss = self.loss(model_values, target_values)
+
+            # recompute the weights
+            print("total loss:", total_loss)
+            if torch.is_tensor(total_loss):
+                total_loss.backward()
+                self.optimizer.step()

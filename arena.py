@@ -1,12 +1,11 @@
 from collections import namedtuple
 from copy import deepcopy
 from typing import Any, NamedTuple
-from knucklebones import Board, KnuckleBonesUtils
-from agents import Agent, RandomAgent, ModelAgent, ValueAgent
-from datapoint import DataPoint, update_training_data
+
 
 def parallel_arena(num_games, player0: Agent, player1: Agent, render=False):
     pass
+
 
 def run_arena(player0: Agent, player1: Agent, render=False):
     training_data: list[DataPoint] = []
@@ -15,7 +14,7 @@ def run_arena(player0: Agent, player1: Agent, render=False):
     players = {0: player0, 1: player1}
     board_dict, number_rolled = board.get_observation()
     while not board.is_over():
-        old_state = deepcopy((board_dict, number_rolled))
+        old_state = deepcopy([board_dict, number_rolled])
         player_action = players[current_player].get_action(
             player=current_player,
             board=deepcopy(board_dict),
@@ -27,7 +26,7 @@ def run_arena(player0: Agent, player1: Agent, render=False):
             DataPoint(
                 old_state,
                 player_action,
-                deepcopy((board_dict, new_number_rolled)),
+                deepcopy([board_dict, new_number_rolled]),
                 current_player,
                 0,
             )
@@ -57,14 +56,13 @@ if __name__ == "__main__":
     winning = {0: 0, 1: 0, 2: 0}
     for i in range(300):
         if i % 2 == 0:
-            winner, training_data = run_arena(
-                value_agent, random_agent, render=i >= 299
-            )
+            winner, training_data = run_arena(value_agent, random_agent, render=i == 0)
         else:
-            winner, training_data = run_arena(
-                random_agent, value_agent, render=i >= 299
-            )
+            winner, training_data = run_arena(random_agent, value_agent, render=i == 0)
+            # map winner to the other winner
             winner = {0: 1, 1: 0, 2: 2}[winner]
+        if(i ==0):
+            print(training_data)
 
         winning[winner] += 1
     print(winning)
