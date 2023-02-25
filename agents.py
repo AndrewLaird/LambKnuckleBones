@@ -6,8 +6,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
-from datapoint import DataPoint
-from knucklebones import KnuckleBonesUtils
 
 device = "cpu"  # gpu_0
 if torch.cuda.is_available():
@@ -123,7 +121,7 @@ class ValueModel(nn.Module):
             )
 
             model_values = self.forward(all_known_states)
-                        # set loss equal to MSE between those
+            # set loss equal to MSE between those
             # total_loss += self.loss(model_value, true_value)
             total_loss = self.loss(model_values, target_values)
 

@@ -20,5 +20,4 @@ if __name__ == "__main__":
         value_agent.train_with_data(all_training_data)
         value_agent.save("value_agent.pt")
         epochs += 1
-        all_training_data  = []
-
+        all_training_data = []

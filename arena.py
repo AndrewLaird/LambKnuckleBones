@@ -1,10 +1,7 @@
-from collections import namedtuple
 from copy import deepcopy
-from typing import Any, NamedTuple
-
-
-def parallel_arena(num_games, player0: Agent, player1: Agent, render=False):
-    pass
+from agents.agents import Agent, ModelAgent, RandomAgent, ValueAgent
+from environment.datapoint import DataPoint, update_training_data
+from environment.knucklebones import Board, KnuckleBonesUtils
 
 
 def run_arena(player0: Agent, player1: Agent, render=False):
@@ -38,30 +35,29 @@ def run_arena(player0: Agent, player1: Agent, render=False):
 
         current_player = KnuckleBonesUtils.other_player(current_player)
         number_rolled = new_number_rolled
-    reward = board.get_winner()
-    if reward == 2:
+    # responsiblity of the individual interpretation
+    # if reward == 2:
         # do we train on ties?
-        return reward, []
-    training_data = update_training_data(training_data, reward)
+        # return reward, []
+    #training_data = update_training_data(training_data, reward)
 
     return board.get_winner(), training_data
 
 
 if __name__ == "__main__":
     random_agent = RandomAgent()
-    default_model_agent = ModelAgent()
-    value_agent = ValueAgent()
-    value_agent.load("value_agent.pt")
 
     winning = {0: 0, 1: 0, 2: 0}
     for i in range(300):
         if i % 2 == 0:
-            winner, training_data = run_arena(value_agent, random_agent, render=i == 0)
-        else:
-            winner, training_data = run_arena(random_agent, value_agent, render=i == 0)
+            winner, training_data = run_arena(random_agent, random_agent, render=i == 0)
             # map winner to the other winner
             winner = {0: 1, 1: 0, 2: 2}[winner]
-        if(i ==0):
+        else:
+            winner, training_data = run_arena(random_agent, random_agent, render=i == 0)
+            # map winner to the other winner
+            winner = {0: 1, 1: 0, 2: 2}[KnuckleBonesUtils.other_player_or_tie(winner)]
+        if i == 0:
             print(training_data)
 
         winning[winner] += 1

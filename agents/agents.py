@@ -2,19 +2,20 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from copy import deepcopy
 import numpy as np
-from model import DefaultModel, ValueModel, state_to_tensor
 import random
-from knucklebones import Board, KnuckleBonesUtils
 import torch
-from datapoint import DataPoint
 import os.path
+from typing import List
+from environment.knucklebones import Board, KnuckleBonesUtils
+
+from environment.datapoint import DataPoint
 
 
 # abstract class
 class Agent(ABC):
     @abstractmethod
     def get_action(
-        self, player: int, board: list[list[list[int]]], number_rolled: int
+        self, player: int, board: List[List[List[int]]], number_rolled: int
     ) -> int:
         """
         player: 0 or 1 denoting which side of the board you're on
@@ -43,7 +44,7 @@ class Agent(ABC):
 
 
 class RandomAgent(Agent):
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
+    def get_action(self, player: int, board: List[List[List[int]]], number_rolled: int):
         board_obj = Board(board)
         valid_moves = board_obj.get_valid_moves(player)
         return valid_moves[random.randint(0, len(valid_moves) - 1)]
@@ -57,7 +58,7 @@ class DepthAgent(Agent):
     def get_position_value(self, player, board, depth):
         pass
 
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
+    def get_action(self, player: int, board: List[List[List[int]]], number_rolled: int):
         # Create function to get the average score of position
         # Look at all 18 actions that can come off this action and
         pass
@@ -67,7 +68,7 @@ class BellmanAgent(Agent):
     def __init__(self):
         pass
 
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
+    def get_action(self, player: int, board: List[List[List[int]]], number_rolled: int):
 
         state = KnuckleBonesUtils.flatten_board(board)
         state.append(number_rolled)
@@ -85,7 +86,7 @@ class ModelAgent(Agent):
         self.my_default_model = DefaultModel()
         pass
 
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
+    def get_action(self, player: int, board: List[List[List[int]]], number_rolled: int):
 
         # [0,2]
         valid_moves = KnuckleBonesUtils.get_valid_moves(board, player)
@@ -103,7 +104,7 @@ class ModelAgent(Agent):
         action = np.argmax(action_probs)
         return action
 
-    def train(self, training_data: list[DataPoint]):
+    def train(self, training_data: List[DataPoint]):
 
         # for each datapoint
         # run it through the network to get what it thinks it should be
@@ -128,14 +129,14 @@ class ValueAgent(Agent):
             self.value_model.load_state_dict(torch.load(name))
 
     def get_possible_states_from_state_action(
-        self, player: int, board: list[list[list[int]]], number_rolled: int, action: int
+        self, player: int, board: List[List[List[int]]], number_rolled: int, action: int
     ):
         """Get all S' for (s,a)"""
         next_board = KnuckleBonesUtils.insert_col(board, player, action, number_rolled)
         for i in range(1, 7):
             yield (deepcopy(next_board), i)
 
-    def get_action(self, player: int, board: list[list[list[int]]], number_rolled: int):
+    def get_action(self, player: int, board: List[List[List[int]]], number_rolled: int):
         valid_moves = KnuckleBonesUtils.get_valid_moves(board, player)
         move_expected_values = defaultdict(float)
         for valid_move in valid_moves:
@@ -167,7 +168,7 @@ class ValueAgent(Agent):
         self,
         game_num: int,
         player: int,
-        board: list[list[list[int]]],
+        board: List[List[List[int]]],
         number_rolled: int,
     ):
         self.action_requests[game_num] = (player, board, number_rolled)
@@ -178,5 +179,5 @@ class ValueAgent(Agent):
     def read_action(self, game_num):
         return self.all_actions[game_num]
 
-    def train_with_data(self, training_data: list[DataPoint]):
+    def train_with_data(self, training_data: List[DataPoint]):
         self.value_model.train_with_data(training_data)

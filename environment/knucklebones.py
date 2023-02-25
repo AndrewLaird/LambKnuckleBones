@@ -6,13 +6,11 @@
 # the ones matching on the enemy side are removed
 # play continues until one player fills up their board
 import random
-from collections import Counter, defaultdict
-from enum import Enum
+from collections import Counter
 import copy
-from typing import Union
 import numpy as np
+from typing import List
 
-import sys
 
 BOARD_WIDTH = 3
 BOARD_HEIGHT = 3
@@ -34,7 +32,13 @@ class KnuckleBonesUtils:
         return (player + 1) % 2
 
     @staticmethod
-    def get_valid_moves(board, player: int) -> list[int]:
+    def other_player_or_tie(player: int) -> int:
+        if player == 2:
+            return player
+        return (player + 1) % 2
+
+    @staticmethod
+    def get_valid_moves(board, player: int) -> List[int]:
         valid_cols = []
         for col in range(BOARD_WIDTH):
             if 0 in board[player][col]:
@@ -146,18 +150,16 @@ class KnuckleBonesUtils:
         return random.randrange(1, 7)
 
     @staticmethod
-    def flatten_board(board) -> list[int]:
+    def flatten_board(board) -> List[int]:
         # turns [3,3,2] to [18,1]
         return list(np.array(board).flatten())
-    
+
     @staticmethod
     def flip_board(board):
         temp = board[0]
         board[0] = board[1]
         board[1] = temp
         return board
-
-    def board_to_tensor(board):
 
 
 class Board:
