@@ -1,8 +1,5 @@
 from screenshot import read_board, click_board
 import pyautogui
-import random
-from environment import Board, get_best_move, get_best_move_average_value
-from agents import Agent, ValueAgent
 
 import time
 

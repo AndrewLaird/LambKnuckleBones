@@ -7,6 +7,7 @@ import skimage.filters
 import numpy as np
 
 
+
 MASTER_WIDTH = 2560
 MASTER_HEIGHT = 1440
 

@@ -22,7 +22,6 @@ class Agent(ABC):
         board: shape(2,3,3), board[0] is player0's 3x3 board
         number_rolled: 1-6 the dice you get to place this turn
         """
-        pass
 
 
 """
@@ -45,24 +44,60 @@ class Agent(ABC):
 
 class RandomAgent(Agent):
     def get_action(self, player: int, board: List[List[List[int]]], number_rolled: int):
-        board_obj = Board(board)
+        board_obj = Board()
+        board_obj.upload_board(board)
         valid_moves = board_obj.get_valid_moves(player)
         return valid_moves[random.randint(0, len(valid_moves) - 1)]
 
-
 class DepthAgent(Agent):
-    def __init__(self):
+    def __init__(self, max_depth=5):
         self.visited = {}
-        self.max_depth = 3
+        self.max_depth = max_depth
 
-    def get_position_value(self, player, board, depth):
-        pass
+    def get_position_value(self, player, board):
+        return KnuckleBonesUtils.get_score(board, player)
 
     def get_action(self, player: int, board: List[List[List[int]]], number_rolled: int):
-        # Create function to get the average score of position
-        # Look at all 18 actions that can come off this action and
-        pass
+        best_action = None
+        best_score = float('-inf')
 
+        for roll in range(1, 7):
+            for action in KnuckleBonesUtils.get_valid_moves(board, player):
+                next_board = KnuckleBonesUtils.insert_col( deepcopy(board), player, action, roll)
+                score = self.minimax(player, next_board, self.max_depth - 1, float('-inf'), float('inf'), False)
+                if score > best_score:
+                    best_score = score
+                    best_action = action
+
+        return best_action
+
+    def minimax(self, player, board, depth, alpha, beta, is_maximizing):
+        if depth == 0 or KnuckleBonesUtils.is_over(board):
+            return self.get_position_value(player, board)
+
+        if is_maximizing:
+            best_score = float('-inf')
+            for action in KnuckleBonesUtils.get_valid_moves(board, player):
+                for roll in range(1, 7):
+                    next_board = KnuckleBonesUtils.insert_col( deepcopy(board), player, action, roll)
+                    score = self.minimax(player, next_board, depth - 1, alpha, beta, False)
+                    best_score = max(best_score, score)
+                    alpha = max(alpha, best_score)
+                    if beta <= alpha:
+                        break
+            return best_score
+        else:
+            best_score = float('inf')
+            opponent = (player + 1) % 2
+            for action in KnuckleBonesUtils.get_valid_moves(board, opponent):
+                for roll in range(1, 7):
+                    next_board = KnuckleBonesUtils.insert_col(deepcopy(board), opponent, action, roll)
+                    score = self.minimax(player, next_board, depth - 1, alpha, beta, True)
+                    best_score = min(best_score, score)
+                    beta = min(beta, best_score)
+                    if beta <= alpha:
+                        break
+            return best_score
 
 class BellmanAgent(Agent):
     def __init__(self):
@@ -74,7 +109,6 @@ class BellmanAgent(Agent):
         state.append(number_rolled)
         # state is now [19,1]
 
-        pass
 
 
 def normalize_data(data):
@@ -84,7 +118,6 @@ def normalize_data(data):
 class ModelAgent(Agent):
     def __init__(self):
         self.my_default_model = DefaultModel()
-        pass
 
     def get_action(self, player: int, board: List[List[List[int]]], number_rolled: int):
 
@@ -119,7 +152,6 @@ class ValueAgent(Agent):
         self.value_model = ValueModel()
         self.action_requests = {}
         self.all_actions = {}
-        pass
 
     def save(self, name):
         torch.save(self.value_model.state_dict(), name)

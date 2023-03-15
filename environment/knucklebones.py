@@ -38,15 +38,16 @@ class KnuckleBonesUtils:
         return (player + 1) % 2
 
     @staticmethod
-    def get_valid_moves(board, player: int) -> List[int]:
-        valid_cols = []
-        for col in range(BOARD_WIDTH):
-            if 0 in board[player][col]:
-                valid_cols.append(col)
-        return valid_cols
+    def get_valid_moves(board:List[List[List[int]]], player: int) -> List[int]:
+        valid_cols = set()
+        for row in range(BOARD_HEIGHT):
+            for col in range(BOARD_WIDTH):
+                if board[player][row][col] == 0:
+                    valid_cols.add(col)
+        return list(valid_cols)
 
     @staticmethod
-    def get_score(board, player) -> int:
+    def get_score(board:List[List[List[int]]], player) -> int:
         score = 0
         for col in range(BOARD_WIDTH):
             counter = Counter(board[player][col])
@@ -55,11 +56,11 @@ class KnuckleBonesUtils:
         return score
 
     @staticmethod
-    def insert_col(board, player, col, value) -> dict:
+    def insert_col(board:List[List[List[int]]], player, col, value) -> List[List[List[int]]]:
         # it's got to be put in the first non zero position
         for row in range(BOARD_HEIGHT):
-            if board[player][col][row] == 0:
-                board[player][col][row] = value
+            if board[player][row][col] == 0:
+                board[player][row][col] = value
                 break
         else:
             # can't insert into this col
@@ -74,7 +75,7 @@ class KnuckleBonesUtils:
         return board
 
     @staticmethod
-    def get_score_difference(board, player) -> int:
+    def get_score_difference(board:List[List[List[int]]], player) -> int:
         player0_score = KnuckleBonesUtils.get_score(board, 0)
         player1_score = KnuckleBonesUtils.get_score(board, 1)
         difference = player0_score - player1_score
@@ -83,20 +84,20 @@ class KnuckleBonesUtils:
         return difference
 
     @staticmethod
-    def delete_values_matching_in_column(board, player, col, value) -> dict:
+    def delete_values_matching_in_column(board:List[List[List[int]]], player, col, value) -> List[List[List[int]]]:
         # only hard part is sliding the rest down
         slide_amount = 0
         for row in range(BOARD_HEIGHT):
-            if board[player][col][row] == value:
+            if board[player][row][col] == value:
                 slide_amount += 1
-                board[player][col][row] = 0
+                board[player][row][col] = 0
             elif slide_amount > 0:
-                board[player][col][row - slide_amount] = board[player][col][row]
-                board[player][col][row] = 0
+                board[player][col][row - slide_amount] = board[player][row][col]
+                board[player][row][col] = 0
         return board
 
     @staticmethod
-    def is_over(board) -> bool:
+    def is_over(board:List[List[List[int]]]) -> bool:
         """
         One person has a fully filled board
         """
@@ -107,10 +108,11 @@ class KnuckleBonesUtils:
         return False
 
     @staticmethod
-    def get_winner(board) -> int:
+    def get_winner(board:List[List[List[int]]]) -> int:
         if not KnuckleBonesUtils.is_over(board):
             return 3  # shouldn't be called
         score_difference = KnuckleBonesUtils.get_score_difference(board, 0)
+        print("score difference", score_difference)
         if score_difference == 0:
             return 2
         if score_difference > 0:
@@ -118,7 +120,7 @@ class KnuckleBonesUtils:
         return 1
 
     @staticmethod
-    def repr_player(board, player, reverse_rows=False) -> str:
+    def repr_player(board:List[List[List[int]]], player, reverse_rows=False) -> str:
         player_board = board[player]
         # 2d array we want all the 0's then all the 1's
         rows = []
@@ -126,14 +128,14 @@ class KnuckleBonesUtils:
         for row in range(BOARD_HEIGHT):
             str_repr = ""
             for col in range(BOARD_WIDTH):
-                str_repr += str(player_board[col][row])
+                str_repr += str(player_board[row][col])
             rows.append(str_repr)
         if reverse_rows:
             return "\n".join(rows[::-1])
         return "\n".join(rows)
 
     @staticmethod
-    def __repr__(board) -> str:
+    def __repr__(board:List[List[List[int]]]) -> str:
         # print the top player as player 0
         return (
             KnuckleBonesUtils.repr_player(board, 1, reverse_rows=True)
@@ -150,12 +152,12 @@ class KnuckleBonesUtils:
         return random.randrange(1, 7)
 
     @staticmethod
-    def flatten_board(board) -> List[int]:
+    def flatten_board(board:List[List[List[int]]]) -> List[int]:
         # turns [3,3,2] to [18,1]
         return list(np.array(board).flatten())
 
     @staticmethod
-    def flip_board(board):
+    def flip_board(board:List[List[List[int]]]):
         temp = board[0]
         board[0] = board[1]
         board[1] = temp
@@ -167,11 +169,11 @@ class Board:
     Handy class with state that uses the staticmethods from above
     """
 
-    def __init__(self, board=None):
-        if board is not None:
-            self.board = board
-        else:
-            self.board = copy.deepcopy(KnuckleBonesUtils.EMPTY_BOARD)
+    def __init__(self):
+        self.board = copy.deepcopy(KnuckleBonesUtils.EMPTY_BOARD)
+
+    def upload_board(self, board):
+        self.board = board
 
     def get_valid_moves(self, player: int):
         return KnuckleBonesUtils.get_valid_moves(self.board, player)
