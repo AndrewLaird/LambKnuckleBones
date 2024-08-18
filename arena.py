@@ -1,5 +1,6 @@
 from copy import deepcopy
 from agents.agents import Agent, DepthAgent, ModelAgent, RandomAgent, ValueAgent
+from agents.mcts_agent import MCTSAgent
 from environment.datapoint import DataPoint, update_training_data
 from environment.knucklebones import Board, KnuckleBonesUtils
 
@@ -47,22 +48,22 @@ def run_arena(player0: Agent, player1: Agent, render=False):
 if __name__ == "__main__":
     random_agent = RandomAgent()
     depth_agent = DepthAgent()
+    mcts_agent = MCTSAgent()
 
-    agent_a = random_agent
-    agent_b = depth_agent
+    agent_a = mcts_agent
+    agent_b = random_agent
 
     winning = {0: 0, 1: 0, 2: 0}
-    for i in range(300):
-        if i % 2 == 0:
-            winner, training_data = run_arena(agent_a, agent_b, render=i%300 ==  0)
+    total_games = 300
+    for i in range(total_games):
+        if i < (total_games/2):
+            winner, training_data = run_arena(agent_a, agent_b, render=i%total_games ==  0)
             print("agent_a first: ", winner)
-            # map winner to the other winner
-            winner = {0: 1, 1: 0, 2: 2}[winner]
         else:
-            winner, training_data = run_arena(agent_b, agent_a, render=i%300 == 0)
+            winner, training_data = run_arena(agent_b, agent_a, render=i%total_games == 0)
             print("agent_b first: ", winner)
             # map winner to the other winner
-            winner = {0: 1, 1: 0, 2: 2}[KnuckleBonesUtils.other_player_or_tie(winner)]
+            winner = KnuckleBonesUtils.other_player_or_tie(winner)
         if i == 0:
             print(training_data)
 

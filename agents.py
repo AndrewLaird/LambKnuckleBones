@@ -6,13 +6,10 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
-
 device = "cpu"  # gpu_0
 if torch.cuda.is_available():
     device_name = torch.cuda.get_device_name(0)
-    print("found device", device_name)
     device = torch.device("cuda")
-print(f"using device {device}")
 
 
 def state_to_tensor(board: Any, number_rolled: int):

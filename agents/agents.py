@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import math
 from collections import defaultdict
 from copy import deepcopy
 import numpy as np
@@ -9,6 +10,7 @@ from typing import List
 from environment.knucklebones import Board, KnuckleBonesUtils
 
 from environment.datapoint import DataPoint
+
 
 
 # abstract class
@@ -49,6 +51,7 @@ class RandomAgent(Agent):
         valid_moves = board_obj.get_valid_moves(player)
         return valid_moves[random.randint(0, len(valid_moves) - 1)]
 
+
 class DepthAgent(Agent):
     def __init__(self, max_depth=5):
         self.visited = {}
@@ -61,43 +64,181 @@ class DepthAgent(Agent):
         best_action = None
         best_score = float('-inf')
 
-        for roll in range(1, 7):
-            for action in KnuckleBonesUtils.get_valid_moves(board, player):
-                next_board = KnuckleBonesUtils.insert_col( deepcopy(board), player, action, roll)
-                score = self.minimax(player, next_board, self.max_depth - 1, float('-inf'), float('inf'), False)
-                if score > best_score:
-                    best_score = score
-                    best_action = action
+        for action in KnuckleBonesUtils.get_valid_moves(board, player):
+            next_board = KnuckleBonesUtils.insert_col(deepcopy(board), player, action, number_rolled)
+            average_score = 0
+            for next_roll in range(1, 7):
+                score = self.minimax(player, next_board, self.max_depth - 1, float('-inf'), float('inf'), False, next_roll)
+                average_score += score / 6
+
+            if average_score > best_score:
+                best_score = average_score
+                best_action = action
 
         return best_action
 
-    def minimax(self, player, board, depth, alpha, beta, is_maximizing):
+    def minimax(self, player, board, depth, alpha, beta, is_maximizing, number_rolled):
         if depth == 0 or KnuckleBonesUtils.is_over(board):
             return self.get_position_value(player, board)
 
         if is_maximizing:
             best_score = float('-inf')
             for action in KnuckleBonesUtils.get_valid_moves(board, player):
-                for roll in range(1, 7):
-                    next_board = KnuckleBonesUtils.insert_col( deepcopy(board), player, action, roll)
-                    score = self.minimax(player, next_board, depth - 1, alpha, beta, False)
-                    best_score = max(best_score, score)
-                    alpha = max(alpha, best_score)
-                    if beta <= alpha:
-                        break
+                next_board = KnuckleBonesUtils.insert_col(deepcopy(board), player, action, number_rolled)
+                average_score = 0
+                for next_roll in range(1, 7):
+                    score = self.minimax(player, next_board, depth - 1, alpha, beta, False, next_roll)
+                    average_score += score / 6
+                best_score = max(best_score, average_score)
+                alpha = max(alpha, best_score)
+                if beta <= alpha:
+                    break
             return best_score
         else:
             best_score = float('inf')
             opponent = (player + 1) % 2
             for action in KnuckleBonesUtils.get_valid_moves(board, opponent):
-                for roll in range(1, 7):
-                    next_board = KnuckleBonesUtils.insert_col(deepcopy(board), opponent, action, roll)
-                    score = self.minimax(player, next_board, depth - 1, alpha, beta, True)
-                    best_score = min(best_score, score)
-                    beta = min(beta, best_score)
-                    if beta <= alpha:
-                        break
+                next_board = KnuckleBonesUtils.insert_col(deepcopy(board), opponent, action, number_rolled)
+                average_score = 0
+                for next_roll in range(1, 7):
+                    score = self.minimax(player, next_board, depth - 1, alpha, beta, True, next_roll)
+                    average_score += score / 6
+                best_score = min(best_score, average_score)
+                beta = min(beta, best_score)
+                if beta <= alpha:
+                    break
             return best_score
+
+class MCTSNodeAgent(Agent):
+    def __init__(self, num_simulations=1000):
+        self.num_simulations = num_simulations
+        # root_node will be the node we are simulating from in the game
+        # example first move it will be MCTSNode(player, KnuckleBonesUtils.get_initial_board(), number_rolled)
+        # with player being the int representing our player and number_rolled being the int representing the number have to place 
+        # in one of three columns
+        self.root_node = None
+        self.previous_board = None
+
+    def get_opponent_move(self, opponent, old_board, new_board):
+        for col in range(len(old_board[opponent])):
+            for row in range(len(old_board[opponent][col])):
+                if old_board[opponent][col][row] != new_board[opponent][col][row]:
+                    return col, new_board[opponent][col][row]
+
+    def apply_agent_move(self, best_action, number_rolled):
+        for child in self.root_node.children:
+            if child.action == best_action and child.number_rolled == number_rolled:
+                child.parent = None
+                self.root_node = child
+                break
+
+    def update_root_node(self, player, new_board, number_rolled):
+        opponent = (player + 1) % 2
+        if self.root_node is None:
+            self.root_node = MCTSNode(player, KnuckleBonesUtils.get_initial_board(), number_rolled)
+        else:
+            action, number_rolled = self.get_opponent_move(opponent, self.previous_board, new_board)
+            new_child_found = False
+            for child in self.root_node.children:
+                if child.action == action and child.number_rolled == number_rolled:
+                    child.parent = None
+                    self.root_node = child
+                    new_child_found = True
+                    break
+
+            if not new_child_found:
+                child = MCTSNode(player, new_board, number_rolled, parent=self.root_node, action=action)
+                self.root_node.children.append(child)
+                self.root_node = child
+
+    def get_action(self, player: int, board: List[List[List[int]]], number_rolled: int):
+        if self.root_node is None or self.root_node.board != board:
+            self.update_root_node(player, board, number_rolled)
+        self.previous_board = board
+
+        for _ in range(self.num_simulations):
+            selected_node = self.root_node.select()
+            reward = selected_node.rollout()
+            selected_node.backpropagate(reward)
+
+        best_action = self.root_node.get_best_action()
+        self.apply_agent_move(best_action, number_rolled)
+        return best_action
+
+class MCTSNode:
+    def __init__(self, player: int, board: List[List[List[int]]], number_rolled: int, parent=None, action=None):
+        self.player = player
+        self.board = board
+        self.number_rolled = number_rolled
+        self.parent = parent
+        self.action = action
+        self.children = []
+        self.visit_count = 0
+        self.total_reward = 0
+
+    def is_fully_expanded(self):
+        return len(self.children) == len(KnuckleBonesUtils.get_valid_moves(self.board, self.player)) * 6
+
+    def expand(self):
+        valid_moves = KnuckleBonesUtils.get_valid_moves(self.board, self.player)
+        for move in valid_moves:
+            for number_rolled in range(1, 7):
+                child_board = deepcopy(self.board)
+                child_board = KnuckleBonesUtils.insert_col(child_board, self.player, move, self.number_rolled)
+                child_player = (self.player + 1) % 2
+                child = MCTSNode(child_player, child_board, number_rolled, parent=self, action=move)
+                self.children.append(child)
+
+    def select(self):
+        if not self.children:
+            if not self.is_fully_expanded():
+                self.expand()
+            return self
+
+        max_ucb = float('-inf')
+        selected_node = None
+        for child in self.children:
+            ucb = child.get_ucb()
+            if ucb > max_ucb:
+                max_ucb = ucb
+                selected_node = child
+
+        if not selected_node.is_fully_expanded():
+            return selected_node
+        else:
+            return selected_node.select()
+
+    def get_ucb(self):
+        if self.visit_count == 0:
+            return float('inf')
+        else:
+            return self.total_reward / self.visit_count + np.sqrt(2 * np.log(self.parent.visit_count) / self.visit_count)
+
+    def rollout(self):
+        board_copy = deepcopy(self.board)
+        player_copy = self.player
+        while not KnuckleBonesUtils.is_over(board_copy):
+            valid_moves = KnuckleBonesUtils.get_valid_moves(board_copy, player_copy)
+            action = valid_moves[random.randint(0, len(valid_moves) - 1)]
+            number_rolled = random.randint(1, 6)
+            board_copy = KnuckleBonesUtils.insert_col(board_copy, player_copy, action, number_rolled)
+            player_copy = (player_copy + 1) % 2
+
+        return KnuckleBonesUtils.get_score(board_copy, self.player)
+
+    def backpropagate(self, reward):
+        self.visit_count += 1
+        self.total_reward += reward
+        if self.parent is not None:
+            self.parent.backpropagate(reward)
+
+    def get_best_action(self):
+        best_child = max(self.children, key=lambda c: c.visit_count)
+        return best_child.action
+
+    def __str__(self):
+        return f"Node(player={self.player}, action={self.action}, number_rolled={self.number_rolled}, visit_count={self.visit_count}, total_reward={self.total_reward})"
+
 
 class BellmanAgent(Agent):
     def __init__(self):
@@ -213,3 +354,5 @@ class ValueAgent(Agent):
 
     def train_with_data(self, training_data: List[DataPoint]):
         self.value_model.train_with_data(training_data)
+        
+

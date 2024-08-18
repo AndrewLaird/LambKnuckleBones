@@ -28,6 +28,10 @@ class KnuckleBonesUtils:
     ]
 
     @staticmethod
+    def get_initial_board():
+        return copy.deepcopy(KnuckleBonesUtils.EMPTY_BOARD)
+
+    @staticmethod
     def other_player(player: int) -> int:
         return (player + 1) % 2
 
@@ -112,7 +116,6 @@ class KnuckleBonesUtils:
         if not KnuckleBonesUtils.is_over(board):
             return 3  # shouldn't be called
         score_difference = KnuckleBonesUtils.get_score_difference(board, 0)
-        print("score difference", score_difference)
         if score_difference == 0:
             return 2
         if score_difference > 0:
@@ -170,7 +173,7 @@ class Board:
     """
 
     def __init__(self):
-        self.board = copy.deepcopy(KnuckleBonesUtils.EMPTY_BOARD)
+        self.board = KnuckleBonesUtils.get_initial_board()
 
     def upload_board(self, board):
         self.board = board
